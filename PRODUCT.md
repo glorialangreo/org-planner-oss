@@ -22,4 +22,4 @@ Preserve the compact planning interface: neutral surfaces, blue actions, system 
 
 ## Release boundary
 
-This repository remains private pending source/privacy review, dependency notice review, company release approval and a license decision. No license approval or publication is implied.
+The project is released under the MIT license. Distribute only reviewed source and fictional examples; keep runtime records, photos and exports out of the repository. See RELEASE.md for the release checklist.

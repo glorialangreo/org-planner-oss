@@ -1,4 +1,6 @@
-const sourceFile = /^(?:src\/[A-Za-z0-9_-]+\.(?:tsx?|css)|shared\/[A-Za-z0-9_-]+\.ts|server\/[A-Za-z0-9_-]+\.ts|scripts\/[A-Za-z0-9_-]+\.ts|tests\/[A-Za-z0-9_.-]+\.(?:ts|tsx)|(?:README|PRODUCT|RELEASE|THIRD_PARTY_NOTICES)\.md|package(?:-lock)?\.json|tsconfig\.json|(?:vite(?:\.export)?|playwright)\.config\.ts|index\.html|\.gitignore|\.gitattributes)$/;
+import { releaseTemplates } from '../shared/templates.js';
+
+const sourceFile = /^(?:src\/[A-Za-z0-9_-]+\.(?:tsx?|css)|shared\/[A-Za-z0-9_-]+\.ts|server\/[A-Za-z0-9_-]+\.ts|scripts\/[A-Za-z0-9_-]+\.ts|tests\/[A-Za-z0-9_.-]+\.(?:ts|tsx)|(?:README|PRODUCT|RELEASE|THIRD_PARTY_NOTICES)\.md|LICENSE|package(?:-lock)?\.json|tsconfig\.json|(?:vite(?:\.export)?|playwright)\.config\.ts|index\.html|\.gitignore|\.gitattributes)$/;
 export function releaseProblems(path: string, text: string): string[] {
   const problems: string[] = [];
   if (!sourceFile.test(path) && !releaseTemplates.has(path)) problems.push('File is outside the release source allowlist.');
@@ -19,4 +21,3 @@ export function releaseProblems(path: string, text: string): string[] {
   }
   return problems;
 }
-import { releaseTemplates } from '../shared/templates.js';

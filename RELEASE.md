@@ -1,17 +1,17 @@
 # Release requirements
 
-Keep the repository private until the owner explicitly approves publication.
+This project is distributed under the [MIT license](LICENSE). Publish only reviewed source and fictional examples, never runtime data.
 
-## Before publication
+## Before each release
 
-- Obtain company approval to release reused implementation and confirm who owns the copyright.
-- Choose and approve the project's license. No license has been selected or granted by this implementation.
+- Confirm that new contributions and any reused implementation can be released under the project's license.
+- Include the MIT license and copyright notice in source distributions.
 - Review every source file, comment and fixture for personal information, internal organization structure, identifiers, private links and confidential product assumptions. The bundled demo is wholly fictional. Automated pattern checks cannot certify absence of personal information.
 - Review the fresh repository history, not only the current working tree. Never transfer runtime records, photos, exports, environment files or history from another planner.
 - Run the build, core tests, browser tests, release checks and dependency audit.
 - Review dependency notices and any native or browser binaries included in the chosen distribution. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - Test an installation in a clean data directory, including empty setup, spreadsheet import, backup restore, conflict handling and offline exports.
-- Approve the release contents and repository visibility separately. Do not publish a data directory or a demonstration made from actual personnel records.
+- Review the release contents before publishing. Do not publish a data directory or a demonstration made from actual personnel records.
 
 ## Source archives
 
@@ -32,4 +32,4 @@ The check rejects runtime directories, PDFs, arbitrary HTML exports, backups, ph
 - Planner JSON backup imports are limited to 10 MB. Larger stores require a stopped-process file restore.
 - Photos accept local JPEG, PNG and WebP files or direct public HTTPS image URLs. URL downloads contact the image host once, reject private network addresses and redirects, and store normalized image bytes locally.
 - PDF export requires a compatible Playwright Chromium installation and a layout no larger than 18,000 pixels in either dimension.
-- No published license, deployment, integration or public repository is part of this implementation.
+- Publishing source does not deploy the app. Remote hosting, authentication and organization integrations are outside its supported scope.

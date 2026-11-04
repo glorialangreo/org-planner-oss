@@ -14,6 +14,14 @@ test('release check blocks runtime data and exports even if forcibly tracked', (
 test('release check detects credential shapes without storing a real credential', () => {
   assert.ok(releaseProblems('src/App.tsx', `const token = "${'ghp_' + 'a'.repeat(30)}"`).length);
 });
+test('the approved MIT license is included in source releases', () => {
+  const license = readFileSync('LICENSE', 'utf8');
+  assert.ok(license.startsWith('MIT License\n'));
+  assert.ok(license.includes('Copyright (c) 2026 Gloria Langreo'));
+  assert.deepEqual(releaseProblems('LICENSE', license), []);
+  assert.equal(JSON.parse(readFileSync('package.json', 'utf8')).license, 'MIT');
+  assert.equal(JSON.parse(readFileSync('package-lock.json', 'utf8')).packages[''].license, 'MIT');
+});
 test('only exact fictional templates can be distributed as example data', () => {
   for (const [path, expected] of releaseTemplates) {
     assert.equal(readFileSync(path, 'utf8'), expected);

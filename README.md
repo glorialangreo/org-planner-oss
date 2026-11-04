@@ -154,8 +154,18 @@ npm audit
 
 Browser tests use fictional data on loopback port 4184, separate from the normal app. Release checks reject unexpected files, runtime records, modified templates and configured credential or internal-reference patterns. They are safeguards, not proof that arbitrary text contains no personal information.
 
-## Release status and license
+## Fork and contribute
 
-This repository is being prepared for open-source release. Publication approval and the project license are still pending; no open-source license is granted yet.
+Use [Fork](https://github.com/glorialangreo/org-planner-oss/fork) to create a copy on your GitHub profile, then clone your fork and follow [Get started](#get-started). Create a branch for your changes and open a pull request when ready.
 
-See [Release requirements](RELEASE.md) for the publication checklist and source archive instructions, and [Dependency review](THIRD_PARTY_NOTICES.md) for dependency licenses and distribution considerations.
+Keep examples and test fixtures fictional. Do not include personnel records, photos, backups or generated exports in issues, pull requests or commits. Run the development checks above before submitting changes.
+
+The package has `"private": true` to prevent accidental npm publication. This does not restrict GitHub forks or use under the license.
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 Gloria Langreo.
+
+You can fork, modify and redistribute this tool under the MIT license. Keep the copyright and license notice with copies of the software.
+
+See [Release requirements](RELEASE.md) for source archive instructions and the release checklist, and [Dependency review](THIRD_PARTY_NOTICES.md) for dependency licenses and distribution considerations.

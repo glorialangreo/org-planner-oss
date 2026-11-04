@@ -1,5 +1,6 @@
 {
   "name": "org-planner",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.13" },

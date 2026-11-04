@@ -1,6 +1,6 @@
 # Dependency review
 
-This document records package metadata for review. It does not choose a license for this project or replace the full notices distributed with dependencies.
+The project's own code is covered by the [MIT license](LICENSE). This document records dependency metadata for review and does not replace the full notices distributed with dependencies. Dependencies retain their respective licenses.
 
 ## Direct runtime dependencies
 
