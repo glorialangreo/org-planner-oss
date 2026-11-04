@@ -1,0 +1,588 @@
+import { test, expect } from '@playwright/test';
+
+test('planner title links home and protects unsaved scenario edits', async ({ page, context }) => {
+  await page.goto('/');
+  const home = page.getByRole('link', { name: 'Org planner home', exact: true });
+  await expect(home).toHaveAttribute('href', '/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Home navigation');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await expect(page).toHaveURL(/scenario=/);
+  const scenarioUrl = page.url();
+  await page.route('**/api/scenarios/*', route => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 503, json: { error: 'Synthetic save failure' } }) : route.continue());
+  await page.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await page.getByLabel('Move to team').selectOption('systems');
+  await expect(page.getByRole('status')).toHaveText('Save failed');
+  await home.click();
+  await expect(page).toHaveURL(scenarioUrl);
+  await expect(page.getByRole('alert')).toContainText('before opening the planner homepage');
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await page.unroute('**/api/scenarios/*');
+  await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await home.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Current baseline Read only', exact: true })).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe('/');
+  expect(new URL(page.url()).searchParams.has('scenario')).toBe(false);
+  expect(context.pages()).toHaveLength(1);
+});
+
+test('snapshot links open in the current tab and protect unsaved changes', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByLabel('Name', { exact: true }).fill('Snapshot navigation');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await expect(page).toHaveURL(/scenario=/);
+  const scenarioUrl = page.url();
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Name', { exact: true }).fill('Open this snapshot');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  const snapshotUrl = await page.getByLabel('Snapshot URL').inputValue();
+  await page.getByRole('link', { name: 'Open read-only snapshot', exact: true }).click();
+  await expect(page).toHaveURL(snapshotUrl);
+  await expect(page.getByRole('heading', { name: 'Open this snapshot Read only', exact: true })).toBeVisible();
+  expect(context.pages()).toHaveLength(1);
+  await page.getByRole('link', { name: 'Back to Org planner', exact: true }).click();
+  await page.getByRole('link', { name: 'Open this snapshot', exact: true }).click();
+  await expect(page).toHaveURL(snapshotUrl);
+  expect(context.pages()).toHaveLength(1);
+  await page.goto(scenarioUrl);
+  await page.route('**/api/scenarios/*', route => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 503, json: { error: 'Synthetic save failure' } }) : route.continue());
+  await page.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await page.getByLabel('Move to team').selectOption('systems');
+  await expect(page.getByRole('status')).toHaveText('Save failed');
+  await page.getByRole('link', { name: 'Open this snapshot', exact: true }).click();
+  await expect(page).toHaveURL(scenarioUrl);
+  await expect(page.getByRole('alert')).toContainText('before opening a snapshot');
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await page.unroute('**/api/scenarios/*');
+  await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.getByRole('link', { name: 'Open this snapshot', exact: true }).click();
+  await expect(page).toHaveURL(snapshotUrl);
+});
+
+test('local workspace can plan, autosave, undo and publish without signing in', async ({ page, browser }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Current baseline Read only', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Alternative A');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await expect(page.getByRole('heading', { name: 'Alternative A', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await page.getByLabel('Move to team').selectOption('systems');
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByLabel('Move to team')).toHaveValue('experience');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.reload();
+  await page.getByRole('button', { name: 'Alternative A', exact: true }).click();
+  await page.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await expect(page.getByLabel('Reports to')).toHaveValue('alex');
+  await page.getByRole('button', { name: 'Save snapshot' }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Discussion copy');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  const url = await page.getByLabel('Snapshot URL').inputValue();
+  const peer = await browser.newContext();
+  const peerPage = await peer.newPage();
+  await peerPage.goto(url);
+  await expect(peerPage.getByRole('heading', { name: 'Discussion copy Read only', exact: true })).toBeVisible();
+  await peerPage.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await expect(peerPage.getByLabel('Move to team')).toBeDisabled();
+  await expect(peerPage.getByRole('button', { name: 'Export PDF', exact: true })).toBeVisible();
+  await expect(peerPage.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
+  await peer.close();
+});
+
+test('team editing, dragging, deletion and mobile controls preserve people', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Team exercise');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  const before = await page.locator('.react-flow__node').filter({ hasText: 'Core experience' }).boundingBox();
+  const header = page.locator('.team-card').filter({ hasText: 'Core experience' }).locator('.grip');
+  await header.hover();
+  await page.mouse.down(); await page.mouse.move(before!.x + 130, before!.y + 130, { steps: 8 }); await page.mouse.up();
+  const after = await page.locator('.react-flow__node').filter({ hasText: 'Core experience' }).boundingBox();
+  expect(Math.abs(after!.x - before!.x) + Math.abs(after!.y - before!.y)).toBeGreaterThan(30);
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.getByRole('button', { name: 'Core experience', exact: true }).click();
+  await page.getByLabel('Team name').fill('Core workflows');
+  await page.getByRole('button', { name: 'Apply team details' }).click();
+  await page.getByRole('combobox', { name: 'Organization', exact: true }).selectOption('platform');
+  await page.getByLabel('Team leader').selectOption('sam');
+  await page.getByRole('button', { name: 'Move team right' }).click();
+  await page.getByText('Remove team', { exact: true }).click();
+  page.once('dialog', d => d.accept());
+  await page.getByRole('button', { name: 'Remove team and move members' }).click();
+  await expect(page.getByRole('button', { name: 'Core workflows', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Core workflows', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Timezones', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Europe', exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByLabel('Search people').fill('Casey');
+  const searchResults = page.getByRole('region', { name: 'Search results' });
+  const resultsBox = await searchResults.boundingBox();
+  const personBox = await searchResults.getByRole('button', { name: 'Casey Park', exact: true }).boundingBox();
+  expect(resultsBox!.height).toBeGreaterThanOrEqual(personBox!.height);
+  await page.getByRole('region', { name: 'Search results' }).getByRole('button', { name: 'Casey Park', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Person details' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('person dragging changes membership, and failed saves retain a recoverable draft', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Drag and recover');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  const source = page.getByRole('button', { name: 'Sam Chen', exact: false });
+  const destination = page.getByRole('region', { name: 'Design systems', exact: true });
+  await source.dragTo(destination);
+  await destination.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.route('**/api/scenarios/*', route => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: 'Synthetic network failure. Retry save.' }) })
+    : route.continue());
+  await page.getByLabel('Move to team').selectOption('research');
+  await expect(page.getByRole('status')).toContainText('Save failed');
+  await expect(page.getByRole('alert')).toContainText('Synthetic network failure');
+  await expect(page.getByLabel('Move to team')).toHaveValue('research');
+  await page.unroute('**/api/scenarios/*');
+  await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await expect(page.getByRole('status')).toContainText('Saved');
+});
+
+test('people can leave Unassigned by dragging their photo or using the team control', async ({ page }) => {
+  const avatarId = 'a'.repeat(64);
+  await page.route('**/api/workspace', async route => {
+    const response = await route.fetch();
+    const body = await response.json();
+    body.roster.people.find((p: { id: string }) => p.id === 'sam').avatarId = avatarId;
+    await route.fulfill({ response, json: body });
+  });
+  await page.route(`**/api/avatars/${avatarId}`, route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36"><rect width="36" height="36" fill="#ddf4ff"/></svg>',
+  }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Unassigned transfers');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await page.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await page.getByLabel('Move to team').selectOption('');
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.getByRole('button', { name: /fit view/i }).click();
+  const unassigned = page.getByRole('region', { name: 'Unassigned', exact: true });
+  const destination = page.getByRole('region', { name: 'Design systems', exact: true });
+  await unassigned.getByRole('button', { name: 'Sam Chen', exact: false }).locator('img').dragTo(destination);
+  await expect(destination.getByRole('button', { name: 'Sam Chen', exact: false })).toBeVisible();
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await expect(page.getByLabel('Reports to')).toHaveValue('alex');
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(unassigned.getByRole('button', { name: 'Sam Chen', exact: false })).toBeVisible();
+  await page.getByLabel('Move to team').selectOption('experience');
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.reload();
+  await page.getByRole('button', { name: 'Sam Chen', exact: false }).click();
+  await expect(page.getByLabel('Move to team')).toHaveValue('experience');
+});
+
+test('Unassigned pod position supports dragging, keyboard controls, history and durable snapshots', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Unassigned layout');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await expect(page).toHaveURL(/scenario=/);
+  const id = new URL(page.url()).searchParams.get('scenario');
+  const savedState = async () => (await (await page.request.get('/api/workspace')).json()).scenarios.find((s: { id: string }) => s.id === id).state;
+  const original = await savedState();
+  await page.getByRole('button', { name: /fit view/i }).click();
+  const pod = page.getByRole('region', { name: 'Unassigned', exact: true });
+  const before = (await pod.boundingBox())!;
+  const grip = pod.locator('.grip');
+  await grip.hover();
+  const handle = (await grip.boundingBox())!;
+  await page.mouse.down();
+  await page.mouse.move(handle.x + 90, handle.y + 70, { steps: 8 });
+  await page.mouse.up();
+  const after = (await pod.boundingBox())!;
+  expect(Math.abs(after.x - before.x) + Math.abs(after.y - before.y)).toBeGreaterThan(30);
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  const dragged = (await savedState()).unassignedPosition;
+  await pod.getByRole('button', { name: 'Unassigned', exact: true }).click();
+  await page.getByRole('button', { name: 'Move Unassigned pod right', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  expect((await savedState()).unassignedPosition).toEqual({ x: dragged.x + 40, y: dragged.y });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  expect((await savedState()).unassignedPosition).toEqual(dragged);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.reload();
+  const persisted = await savedState();
+  expect(persisted.unassignedPosition).toEqual({ x: dragged.x + 40, y: dragged.y });
+  expect(persisted.assignments).toEqual(original.assignments);
+  expect(persisted.teams).toEqual(original.teams);
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Frozen Unassigned layout');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  const url = await page.getByLabel('Snapshot URL').inputValue();
+  const frozen = await context.newPage();
+  await frozen.goto(url);
+  await frozen.getByRole('button', { name: /fit view/i }).click();
+  await frozen.getByRole('button', { name: 'Unassigned', exact: true }).click();
+  await expect(frozen.getByRole('button', { name: /^Move Unassigned pod/ })).toHaveCount(0);
+  await expect(frozen.locator('.react-flow__node[data-id="__unassigned"]')).not.toHaveClass(/draggable/);
+  const snapshot = await (await page.request.get(`/api/snapshots/${new URL(url).pathname.split('/').at(-1)}`)).json();
+  expect(snapshot.state.unassignedPosition).toEqual(persisted.unassignedPosition);
+  await frozen.close();
+});
+
+test('areas distinguish partner roles and unknown timezones without adding design members', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Areas', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'New area', exact: true })).toBeDisabled();
+  const table = page.getByRole('table', { name: 'Areas and responsibilities' });
+  await expect(table.getByText('Example workflows', { exact: true })).toBeVisible();
+  await expect(table.getByText('Robin Example', { exact: true })).toBeVisible();
+  await expect(table.getByText('Europe · Europe/London', { exact: true })).toBeVisible();
+  await expect(table.getByText('Unknown · Timezone not verified', { exact: true })).toBeVisible();
+  await expect(table.getByText('Named collaborator, not an accountable lead')).toBeVisible();
+  await table.getByRole('button', { name: 'Core experience', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Team details' })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('areas can be created unassigned, shared, edited, reassigned and undone without changing people', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Area planning');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await expect(page.getByRole('heading', { name: 'Area planning', exact: true })).toBeVisible();
+  const scenarioId = new URL(page.url()).searchParams.get('scenario');
+  const before = (await (await page.request.get('/api/workspace')).json()).scenarios.find((s: { id: string }) => s.id === scenarioId).state;
+  await page.getByRole('button', { name: 'Areas', exact: true }).click();
+  await page.getByRole('button', { name: 'New area', exact: true }).click();
+  await page.getByLabel('Area name', { exact: true }).fill('Future workflows');
+  await page.getByLabel('Area of responsibility', { exact: true }).fill('Plan new workflows');
+  await page.getByLabel('Area owner', { exact: true }).fill('Proposed area owner');
+  await page.getByLabel('Area notes', { exact: true }).fill('Ownership needs review');
+  await page.getByRole('button', { name: 'Create area', exact: true }).click();
+  const row = page.getByRole('row').filter({ has: page.getByText('Future workflows', { exact: true }) });
+  await expect(row).toContainText('Unassigned');
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.reload();
+  await row.getByRole('button', { name: 'Edit area Future workflows', exact: true }).click();
+  await expect(page.getByLabel('Area notes', { exact: true })).toHaveValue('Ownership needs review');
+  await page.getByRole('checkbox', { name: 'Core experience Product design', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'Design systems Platform', exact: true }).check();
+  await page.getByRole('button', { name: 'Apply area details', exact: true }).click();
+  await expect(row.getByRole('button', { name: 'Core experience', exact: true })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Design systems', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(row).toContainText('Unassigned');
+  await expect(page.getByRole('checkbox', { name: 'Core experience Product design', exact: true })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByRole('checkbox', { name: 'Core experience Product design', exact: true })).toBeChecked();
+  await page.getByLabel('Area of responsibility', { exact: true }).fill('Shared updated responsibility');
+  await page.getByRole('button', { name: 'Apply area details', exact: true }).click();
+  for (const team of ['Core experience', 'Design systems']) {
+    await row.getByRole('button', { name: team, exact: true }).click();
+    await expect(page.getByRole('complementary', { name: 'Details' })).toContainText('Shared updated responsibility');
+  }
+  await row.getByRole('button', { name: 'Edit area Future workflows', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Core experience Product design', exact: true }).uncheck();
+  await page.getByRole('checkbox', { name: 'Design systems Platform', exact: true }).uncheck();
+  await page.getByRole('checkbox', { name: 'Research Product design', exact: true }).check();
+  await page.getByRole('button', { name: 'Apply area details', exact: true }).click();
+  await expect(row.getByRole('button', { name: 'Research', exact: true })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Core experience', exact: true })).toHaveCount(0);
+  await page.getByRole('checkbox', { name: 'Research Product design', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Apply area details', exact: true }).click();
+  await expect(row).toContainText('Unassigned');
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.reload();
+  await expect(row).toContainText('Shared updated responsibility');
+  await expect(row).toContainText('Unassigned');
+  const after = (await (await page.request.get('/api/workspace')).json()).scenarios.find((s: { id: string }) => s.id === scenarioId).state;
+  expect(after.assignments).toEqual(before.assignments);
+  expect(after.teams).toEqual(before.teams);
+  await row.getByRole('button', { name: 'Edit area Future workflows', exact: true }).click();
+  await page.screenshot({ path: 'test-results/areas-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByLabel('Area name', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/areas-mobile.png' });
+});
+
+test('imported area edits preserve partners and provenance while snapshots stay read only', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Imported area edits');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await page.getByRole('button', { name: 'Areas', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit area Example workflows', exact: true }).click();
+  await page.getByLabel('Area name', { exact: true }).fill('Updated workflows');
+  await page.getByLabel('Area notes', { exact: true }).fill('Scenario note');
+  await page.getByRole('checkbox', { name: 'Design systems Platform', exact: true }).check();
+  await page.getByRole('button', { name: 'Apply area details', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Frozen area discussion');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  const url = await page.getByLabel('Snapshot URL').inputValue();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByLabel('Area name', { exact: true }).fill('Later scenario name');
+  await page.getByRole('button', { name: 'Apply area details', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  const frozen = await context.newPage();
+  await frozen.goto(url);
+  await expect(frozen.getByRole('button', { name: 'New area', exact: true })).toBeDisabled();
+  await expect(frozen.getByRole('button', { name: /^Edit area/ })).toHaveCount(0);
+  const table = frozen.getByRole('table', { name: 'Areas and responsibilities' });
+  await expect(table.getByText('Updated workflows', { exact: true })).toBeVisible();
+  await expect(table.getByText('Robin Example', { exact: true })).toBeVisible();
+  await expect(table.getByText('Named collaborator, not an accountable lead', { exact: true })).toBeVisible();
+  await table.getByText('Area source', { exact: true }).click();
+  await expect(table.locator('details').filter({ has: frozen.getByText('Area source', { exact: true }) }).getByText('Synthetic test fixture', { exact: true })).toBeVisible();
+  await frozen.getByRole('button', { name: 'View area Updated workflows', exact: true }).click();
+  await expect(frozen.getByLabel('Area name', { exact: true })).toHaveCount(0);
+  await expect(frozen.getByRole('complementary', { name: 'Details' })).toContainText('Core experience, Design systems');
+  await frozen.close();
+});
+
+test('area save conflicts retain edits and can be recovered as a separate scenario', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Area conflict');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await page.getByRole('button', { name: 'Areas', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit area Example workflows', exact: true }).click();
+  await page.route('**/api/scenarios/*', route => route.request().method() === 'PUT'
+    ? route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ error: 'This scenario changed in another window. Save a separate scenario or reload.' }) })
+    : route.continue());
+  await page.getByLabel('Area name', { exact: true }).fill('Retained area edit');
+  await page.getByRole('button', { name: 'Apply area details', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Save failed');
+  await page.getByRole('button', { name: 'Current baseline', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Area conflict', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Area name', { exact: true })).toHaveValue('Retained area edit');
+  await page.getByRole('button', { name: 'Save separate scenario', exact: true }).click();
+  await page.getByRole('dialog').getByRole('textbox', { name: 'Name', exact: true }).fill('Recovered areas');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.unroute('**/api/scenarios/*');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Recovered areas', exact: true })).toBeVisible();
+  await expect(page.getByRole('table').getByText('Retained area edit', { exact: true })).toBeVisible();
+});
+
+test('reporting hierarchy shows every edge, focuses people and edits reporting independently', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Hierarchy exercise');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await page.getByRole('button', { name: 'Reporting lines', exact: true }).click();
+  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
+  await expect(page.locator('.report-person').filter({ hasText: 'No manager in scope' })).toBeInViewport();
+  await page.getByLabel('Search people').fill('Casey');
+  await page.getByRole('region', { name: 'Search results' }).getByRole('button', { name: 'Casey Park' }).click();
+  const card = page.locator('.report-person').filter({ hasText: 'Casey Park' });
+  await expect(card).toBeInViewport();
+  await expect(card).toContainText('Reports to Taylor Singh');
+  await expect(card).toContainText('Design systems');
+  await page.getByRole('combobox', { name: /^Reports to/ }).selectOption('sam');
+  await expect(card).toContainText('Reports to Sam Chen');
+  await expect(page.getByLabel('Move to team')).toHaveValue('systems');
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(card).toContainText('Reports to Taylor Singh');
+  await expect(page.getByRole('status')).toContainText('Saved');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Hierarchy exercise', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Reporting lines', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.react-flow__edge')).toHaveCount(7);
+});
+
+test('pods show deduplicated partner photos, fallbacks and snapshot-scoped avatar URLs', async ({ page, context }) => {
+  await page.goto('/');
+  const origin = new URL(page.url()).origin;
+  const state = (await (await page.request.get('/api/workspace')).json()).roster.state;
+  const avatarId = 'a'.repeat(64);
+  state.areas[0].partners[0].avatarId = avatarId;
+  state.areas.push({ ...structuredClone(state.areas[0]), id: 'another-example-area', name: 'Another example area' });
+  state.teams[0].areaIds.push('another-example-area');
+  const created = await page.request.post('/api/scenarios', {
+    headers: { Origin: origin, 'X-Org-Planner': 'local' },
+    data: { name: 'Partner pods', description: '', state },
+  });
+  expect(created.status()).toBe(201);
+  const scenario = await created.json();
+  await context.route(new RegExp(`/avatars/${avatarId}$`), route => route.fulfill({
+    contentType: 'image/svg+xml',
+    body: '<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28"><rect width="28" height="28" fill="#ddf4ff"/><text x="14" y="19" text-anchor="middle" font-size="12" fill="#0550ae">RE</text></svg>',
+  }));
+  await page.goto(`/?scenario=${scenario.id}&view=teams`);
+  const pod = page.getByRole('region', { name: 'Core experience', exact: true });
+  const product = pod.getByRole('button', { name: /^Robin Example, Product partner/ });
+  const engineering = pod.getByRole('button', { name: /^Drew Example, Engineering partner/ });
+  await expect(pod.locator('.pod-partner-avatar')).toHaveCount(2);
+  await expect(pod.locator('.count')).toHaveText('4');
+  await expect(pod.locator('.member')).toHaveCount(4);
+  await expect(product.locator('img')).toHaveAttribute('src', `/api/avatars/${avatarId}`);
+  await expect.poll(() => product.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(28);
+  await expect(engineering.getByLabel('No verified photo')).toHaveText('DE');
+  await product.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Team details', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/partner-pods-desktop.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/partner-pods-mobile.png' });
+  const published = await page.request.post('/api/snapshots', {
+    headers: { Origin: origin, 'X-Org-Planner': 'local' },
+    data: { name: 'Partner pods snapshot', description: '', scenarioId: scenario.id, revision: 1 },
+  });
+  expect(published.status()).toBe(201);
+  const snapshot = await published.json();
+  const frozen = await context.newPage();
+  await frozen.goto(`/s/${snapshot.id}`);
+  await expect(frozen.getByRole('region', { name: 'Core experience', exact: true })
+    .getByRole('button', { name: /^Robin Example, Product partner/ }).locator('img'))
+    .toHaveAttribute('src', `/api/snapshots/${snapshot.id}/avatars/${avatarId}`);
+  await frozen.close();
+  await context.unroute(new RegExp(`/avatars/${avatarId}$`));
+  await context.route(new RegExp(`/avatars/${avatarId}$`), route => route.fulfill({ status: 404 }));
+  await page.reload();
+  await expect(product.getByLabel('Photo unavailable')).toHaveText('RE');
+});
+
+test('leaders render first and snapshots retain their frozen leader order', async ({ page, context }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Leader ordering');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  const pod = page.getByRole('region', { name: 'Core experience', exact: true });
+  await pod.getByRole('button', { name: 'Core experience', exact: true }).click();
+  await page.getByLabel('Team leader').selectOption('sam');
+  await expect(pod.locator('.member-copy strong')).toHaveText(['Sam Chen', 'Alex Rivera', 'Jamie Brooks', 'Morgan Ellis']);
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Frozen leader order');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  const url = await page.getByLabel('Snapshot URL').inputValue();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByLabel('Team leader').selectOption('jamie');
+  await expect(pod.locator('.member-copy strong')).toHaveText(['Jamie Brooks', 'Alex Rivera', 'Sam Chen', 'Morgan Ellis']);
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  const frozen = await context.newPage();
+  await frozen.goto(url);
+  await expect(frozen.getByRole('region', { name: 'Core experience', exact: true }).locator('.member-copy strong'))
+    .toHaveText(['Sam Chen', 'Alex Rivera', 'Jamie Brooks', 'Morgan Ellis']);
+  await frozen.close();
+  await page.reload();
+  await expect(pod.locator('.member-copy strong').first()).toHaveText('Jamie Brooks');
+});
+
+test('snapshot removal confirms intent, retains failed requests and preserves scenarios', async ({ page, browser }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Preserved after removal');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Remove this copy');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  const url = await page.getByLabel('Snapshot URL').inputValue();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  const peer = await browser.newContext();
+  const peerPage = await peer.newPage();
+  await peerPage.goto(url);
+  await expect(peerPage.getByRole('button', { name: 'Remove snapshot', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Remove snapshot Remove this copy', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toContainText('Its link will stop working for everyone');
+  await page.screenshot({ path: 'test-results/snapshot-removal-desktop.png' });
+  const viewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(dialog.getByRole('button', { name: 'Remove snapshot', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: 'test-results/snapshot-removal-mobile.png' });
+  await page.setViewportSize(viewport);
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Remove this copy', exact: true })).toBeVisible();
+  const endpoint = `**/api/snapshots/${new URL(url).pathname.split('/').at(-1)}`;
+  await page.route(endpoint, route => route.request().method() === 'DELETE'
+    ? route.fulfill({ status: 503, json: { error: 'Synthetic removal failure' } }) : route.continue());
+  await page.getByRole('button', { name: 'Remove snapshot Remove this copy', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Remove snapshot', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Synthetic removal failure');
+  await expect(page.getByRole('link', { name: 'Remove this copy', exact: true })).toBeVisible();
+  await page.unroute(endpoint);
+  await dialog.getByRole('button', { name: 'Remove snapshot', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Remove this copy', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Preserved after removal', exact: true })).toBeVisible();
+  await peerPage.bringToFront();
+  await peerPage.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(peerPage.getByRole('heading', { name: 'Workspace unavailable' })).toBeVisible();
+  expect((await peerPage.reload())?.status()).toBe(404);
+  await peer.close();
+  await page.reload();
+  await expect(page.getByRole('link', { name: 'Remove this copy', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Preserved after removal', exact: true })).toBeVisible();
+});
+
+test('scenario title rename supports cancel, autosave and history without renaming snapshots', async ({ page, context }) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Rename scenario', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Create scenario', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Name', exact: true }).fill('Original proposal');
+  await page.getByRole('textbox', { name: 'Description', exact: true }).fill('Preserved description');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create scenario' }).click();
+  await expect(page).toHaveURL(/scenario=/);
+  const id = new URL(page.url()).searchParams.get('scenario');
+  await page.getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Save snapshot', exact: true }).click();
+  const snapshotUrl = await page.getByLabel('Snapshot URL').inputValue();
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.getByRole('button', { name: 'Rename scenario', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue('Original proposal');
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Cancelled name');
+  await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Original proposal', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Rename scenario', exact: true }).click();
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Renamed proposal');
+  await dialog.getByRole('button', { name: 'Rename scenario', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await expect(page.getByRole('heading', { name: 'Renamed proposal', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Renamed proposal', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Original proposal', exact: true })).toBeVisible();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Renamed proposal', exact: true })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('scenario')).toBe(id);
+  await expect(page.getByRole('main').getByText('Preserved description', { exact: true })).toBeVisible();
+  const frozen = await context.newPage();
+  await frozen.goto(snapshotUrl);
+  await expect(frozen.getByRole('heading', { name: 'Original proposal Read only', exact: true })).toBeVisible();
+  await expect(frozen.getByRole('button', { name: 'Rename scenario', exact: true })).toHaveCount(0);
+  await frozen.close();
+});

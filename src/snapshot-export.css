@@ -1,0 +1,15 @@
+.snapshot-export{height:100dvh;display:flex;flex-direction:column;position:relative}
+.export-heading{padding:20px 24px;border-bottom:1px solid var(--border);flex-shrink:0;overflow-wrap:anywhere}
+.export-heading>p{margin-top:8px;white-space:pre-wrap}
+.export-actions{display:flex;align-items:center;gap:8px;padding:12px 24px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+.export-actions button[aria-pressed=true]{background:#ddf4ff;border-color:#b6e3ff}
+.export-details{position:absolute;right:16px;top:170px;bottom:24px;width:min(340px,calc(100vw - 32px));padding:20px;background:white;border:1px solid var(--border);border-radius:8px;overflow:auto;box-shadow:0 4px 20px #1f23281a;z-index:10}
+.export-details>button{float:right}.export-details>p{margin-top:12px;white-space:pre-wrap}
+.printing .snapshot-export{height:auto;display:block}
+.printing .export-actions,.printing .export-details,.printing .react-flow__controls,.printing .react-flow__minimap,.printing .canvas-hint,.printing .react-flow__background{display:none!important}
+.printing .board{height:var(--print-board-height);min-height:0;flex:none}
+.printing .react-flow__viewport{transform:var(--print-transform)!important}
+.printing .areas-view{overflow:visible;min-height:0}
+.printing .areas-view table{table-layout:fixed}
+.printing *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+@media(max-width:540px){.export-heading,.export-actions{padding:12px}.export-heading h1{font-size:18px}}

@@ -1,0 +1,3 @@
+person_id,name,team,manager,role,timezone
+example-1,Cedar Finch,Workshop,,Team lead,Europe/Madrid
+example-2,Nova Vale,Workshop,example-1,Researcher,Asia/Tokyo

@@ -1,0 +1,12 @@
+data/** export-ignore
+snapshots/** export-ignore
+exports/** export-ignore
+backups/** export-ignore
+test-results/** export-ignore
+playwright-report/** export-ignore
+dist/** export-ignore
+.env* export-ignore
+*.pdf export-ignore
+*.zip export-ignore
+planner.json* export-ignore
+planner-backup*.json export-ignore

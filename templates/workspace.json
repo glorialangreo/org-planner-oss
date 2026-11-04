@@ -1,0 +1,149 @@
+{
+  "formatVersion": 1,
+  "baseline": {
+    "importedAt": "2026-01-01T00:00:00.000Z",
+    "scope": "Example workspace",
+    "complete": true,
+    "notes": [
+      "All people, teams and responsibilities in this template are fictional.",
+      "Team membership does not assign a manager or team leader. Blank managers remain unset."
+    ],
+    "people": [
+      {
+        "id": "example-1",
+        "name": "Cedar Finch",
+        "title": "Team lead",
+        "timezone": "Europe/Madrid",
+        "avatarId": null,
+        "source": "Spreadsheet import"
+      },
+      {
+        "id": "example-2",
+        "name": "Nova Vale",
+        "title": "Researcher",
+        "timezone": "Asia/Tokyo",
+        "avatarId": null,
+        "source": "Spreadsheet import"
+      }
+    ],
+    "state": {
+      "regionGroups": [],
+      "orgs": [
+        {
+          "id": "organization",
+          "name": "Example workspace"
+        }
+      ],
+      "teams": [
+        {
+          "id": "team-1",
+          "name": "Workshop",
+          "description": "",
+          "orgId": "organization",
+          "leaderId": null,
+          "position": {
+            "x": 0,
+            "y": 0
+          },
+          "areaIds": [
+            "area-import-1"
+          ]
+        }
+      ],
+      "areas": [
+        {
+          "id": "area-import-1",
+          "name": "Customer support",
+          "description": "Help customers use the service",
+          "owner": "Cedar Finch",
+          "source": "Area spreadsheet import",
+          "notes": "",
+          "partners": []
+        }
+      ],
+      "unassignedPosition": {
+        "x": -360,
+        "y": 0
+      },
+      "assignments": [
+        {
+          "personId": "example-1",
+          "teamId": "team-1",
+          "managerId": null,
+          "regionOverride": null
+        },
+        {
+          "personId": "example-2",
+          "teamId": "team-1",
+          "managerId": "example-1",
+          "regionOverride": null
+        }
+      ]
+    }
+  },
+  "references": [],
+  "scenarios": [
+    {
+      "id": "example-plan",
+      "name": "Example workspace plan",
+      "description": "A fictional workspace for trying imports.",
+      "state": {
+        "regionGroups": [],
+        "orgs": [
+          {
+            "id": "organization",
+            "name": "Example workspace"
+          }
+        ],
+        "teams": [
+          {
+            "id": "team-1",
+            "name": "Workshop",
+            "description": "",
+            "orgId": "organization",
+            "leaderId": null,
+            "position": {
+              "x": 0,
+              "y": 0
+            },
+            "areaIds": [
+              "area-import-1"
+            ]
+          }
+        ],
+        "areas": [
+          {
+            "id": "area-import-1",
+            "name": "Customer support",
+            "description": "Help customers use the service",
+            "owner": "Cedar Finch",
+            "source": "Area spreadsheet import",
+            "notes": "",
+            "partners": []
+          }
+        ],
+        "unassignedPosition": {
+          "x": -360,
+          "y": 0
+        },
+        "assignments": [
+          {
+            "personId": "example-1",
+            "teamId": "team-1",
+            "managerId": null,
+            "regionOverride": null
+          },
+          {
+            "personId": "example-2",
+            "teamId": "team-1",
+            "managerId": "example-1",
+            "regionOverride": null
+          }
+        ]
+      },
+      "revision": 1
+    }
+  ],
+  "snapshots": [],
+  "avatars": []
+}
